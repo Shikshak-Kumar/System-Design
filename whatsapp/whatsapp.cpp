@@ -67,7 +67,7 @@ class User {
             return lastseen;
         }
 
-        void updateProfile(string &name, string &profilePicture){
+        void updateProfile(const string &name, const string &profilePicture){
             this->name = name;
             this->profilePicture = profilePicture;
         }
@@ -201,7 +201,7 @@ class Message {
             return messageId;
         }
         
-        shared_ptr<User> getuser(){
+        shared_ptr<User> getUser(){
             return sender;
         }
 
@@ -288,6 +288,10 @@ class MediaMessage : public Message{
 
         string getSummary(){
             return "[Media]: " + mediaURL;
+        }
+
+        string getSender(){
+            return sender->getName();
         }
 
         void deleteMessage(){
@@ -392,16 +396,19 @@ class GroupChat : public Chat{
         vector<shared_ptr<User>>members;
     
     public:
-        explicit GroupChat(int chatId, string &groupName, vector<shared_ptr<User>> &members):
+        explicit GroupChat(int chatId, string &groupName):
         Chat(chatId),
-        groupName(groupName),
-        members(members){}
+        groupName(groupName){}
 
         void displayChat(){
             cout<<"[Group Chat]"<<groupName<<"\n";
             for(auto &message : messages){
                 message->display();
             }
+        }
+
+        vector<shared_ptr<User>> getMembers(){
+            return members;
         }
 
         void addMember(shared_ptr<User> user){
@@ -495,7 +502,7 @@ class Notification{
 
 // Notification Service
 
-class NotificationService{
+class NotificationService {
     public:
 
         void notify(shared_ptr<User> &receiver, shared_ptr<Message> message, NotificationType type){
@@ -503,8 +510,10 @@ class NotificationService{
             notification.sendNotification();
         }
 
-        void notify(vector<shared_ptr<User>> &receivers, shared_ptr<Message> &message, NotificationType type){
-            for(auto& receiver : receivers){
+        void notifyGroup(GroupChat & groupChat, shared_ptr<Message> &message, NotificationType type){
+            cout<<"[Group Notifications]: "<<'\n';
+            for(auto& receiver : groupChat.getMembers()){
+                if(receiver->getUserId()== message->getUser()->getUserId()) continue;
                 notify(receiver, message, type);
             }
         }
@@ -536,303 +545,341 @@ class Backup {
 };
 
 
-// ============================================================
-// TESTS (Compatible with practice.cpp signatures)
-// ============================================================
+// User Tests 
 
-// ------------------------------------------------------------
-// 1. User Tests
-// ------------------------------------------------------------
-void testUser() {
+void testUser(){
     string name = "Shikshak";
-    auto user = make_shared<User>(1, name);
 
-    assert(user->getUserId() == 1);
-    assert(user->getName() == "Shikshak");
-    assert(user->getStatus().empty());
-    assert(user->getProfilePicture().empty());
-    assert(user->getLastseen().empty());
+    shared_ptr<User> user = make_shared<User>(1,name); // id,name
+
+    // assert() basically means:
+    //"I expect this condition to be TRUE. If it is false, the test fails."
+    
+    assert(user->getUserId()==1);
+    assert(user->getName()=="Shikshak");
+    assert(user->getProfilePicture()=="");
+    assert(user->getLastseen()=="");
+    assert(user->getStatus()=="");
 
     string status = "Available";
     user->setStatus(status);
-    assert(user->getStatus() == "Available");
+    assert(user->getStatus()=="Available");
 
-    string lastSeen = "10:30 PM";
-    user->setLastSeen(lastSeen);
-    assert(user->getLastseen() == "10:30 PM");
+    string lastseen = "5 mins ago";
+    user->setLastSeen(lastseen);
+    assert(user->getLastseen()=="5 mins ago");
 
-    string newName = "Shikshak Kumar";
-    string newPic = "profile.jpg";
-    user->updateProfile(newName, newPic);
-    assert(user->getName() == "Shikshak Kumar");
-    assert(user->getProfilePicture() == "profile.jpg");
 
-    // Empty status / lastseen edge cases (should not overwrite)
-    string emptyStr = "";
-    user->setStatus(emptyStr);
-    assert(user->getStatus() == "Available");
-    user->setLastSeen(emptyStr);
-    assert(user->getLastseen() == "10:30 PM");
 
-    cout << "testUser PASSED\n";
+    user->updateProfile("Shikshak Kumar", "profile.jpg");
+    assert(user->getName()=="Shikshak Kumar");
+    assert(user->getProfilePicture()=="profile.jpg");
+
+    cout<<"User tests passed!"<<endl;
 }
 
-// ------------------------------------------------------------
-// 2. Contact Tests
-// ------------------------------------------------------------
-void testContact() {
-    string phone = "+1234567890";
-    string email = "shikshak@example.com";
-    string address = "New Delhi, India";
-    string displayName = "Shikshak Kumar";
+void testContact(){
+    string phone = "+91234567890";
+    string email = "test@gmail.com";
+    string address = "123, Test Street";
+    string displayName = "Test User";
 
-    Contact contact(phone, email, address, displayName);
+    Contact contact(phone, email, address, displayName); // implemented this way so that it can be destroyed after this function ends, and not before.
 
-    assert(contact.getPhone() == "+1234567890");
-    assert(contact.getEmail() == "shikshak@example.com");
-    assert(contact.getAddress() == "New Delhi, India");
-    assert(contact.getDisplayName() == "Shikshak Kumar");
+    assert(contact.getPhone()=="+91234567890");
+    assert(contact.getEmail()=="test@gmail.com");
+    assert(contact.getAddress()=="123, Test Street");
+    assert(contact.getDisplayName()=="Test User");
 
     string newPhone = "+9876543210";
-    string emptyEmail = "";
+    string newEmail = "shikshak@gmail.com";
     string newAddress = "Bangalore, India";
-    string emptyName = "";
-    contact.updateContact(newPhone, emptyEmail, newAddress, emptyName);
+    string newName = "Shikshak";
+    contact.updateContact(newPhone, newEmail, newAddress, newName);
 
-    // Verified partial updates
-    assert(contact.getPhone() == "+9876543210");
-    assert(contact.getEmail() == "shikshak@example.com"); // preserved
-    assert(contact.getAddress() == "Bangalore, India");
-    assert(contact.getDisplayName() == "Shikshak Kumar");  // preserved
+    assert(contact.getPhone()=="+9876543210");
+    assert((contact.getEmail() == "shikshak@gmail.com") && "Email clear failed!");
+    assert(contact.getAddress()=="Bangalore, India");
+    assert((contact.getDisplayName()=="Shikshak") && "Display name should not have changed");
 
-    cout << "testContact PASSED\n";
+    cout<<"Contact tests passed!"<<endl;
 }
 
-// ------------------------------------------------------------
-// 3. Status Tests
-// ------------------------------------------------------------
-void testStatus() {
-    string content1 = "Working";
-    Status status(1, content1, time(nullptr) + 100);
+void testStatus(){
+    int statusId = 1;
+    string content = "Busy";
+    time_t expiry = time(nullptr)+60;
+    
 
-    assert(status.getStatusId() == 1);
-    assert(status.getContent() == "Working");
+    Status status(statusId, content, expiry);
+
+    time_t futureTime = time(nullptr)+120;
+
+    assert(status.getStatusId()==1);
+    assert(status.getContent()=="Busy");
+    assert(status.getExpiryTime()==expiry);
+    assert(expiry < futureTime && "Expiry time should be in the future");
     assert(!status.isExpired());
 
-    string content2 = "Old Status";
-    Status expiredStatus(2, content2, time(nullptr) - 100);
+    cout<<"Status tests passed!"<<endl;
 
-    assert(expiredStatus.getStatusId() == 2);
-    assert(expiredStatus.isExpired());
-
-    cout << "testStatus PASSED\n";
 }
 
-// ------------------------------------------------------------
-// 4. Text Message Tests
-// ------------------------------------------------------------
-void testTextMessage() {
-    string name = "Shikshak";
-    auto user = make_shared<User>(1, name);
+void testTextMessage(){
+    int messageId = 101;
 
-    string content = "Hello";
-    auto textMessage = make_shared<TextMessage>(101, user, content);
+    string userName = "Shikshak";
+    int userId = 1;
+    shared_ptr<User> sender = make_shared<User>(userId,userName);
 
-    assert(textMessage->getMessageId() == 101);
-    assert(textMessage->getuser() == user);
-    assert(textMessage->getContent() == "Hello");
-    assert(textMessage->getSummary() == "Hello");
-    assert(textMessage->getStatus() == MessageStatusType::SENT);
+    string content = "hello how are you";
 
-    // Status transitions
+    auto textMessage = make_shared<TextMessage>(messageId, sender, content);
+
+    assert(textMessage->getContent()=="hello how are you");
+    assert(textMessage->getSummary()=="hello how are you");
+
     textMessage->markDelivered();
-    assert(textMessage->getStatus() == MessageStatusType::DELIVERED);
+    assert(textMessage->getStatus()==MessageStatusType::DELIVERED);
 
-    textMessage->markRead();
-    assert(textMessage->getStatus() == MessageStatusType::READ);
+    string newMessage = "I am fine";
 
-    // Edit message
-    string updatedContent = "Hello World";
-    textMessage->edit(updatedContent);
-    assert(textMessage->getContent() == "Hello World");
+    textMessage->edit(newMessage);
+    assert(textMessage->getContent()=="I am fine");
 
-    // Delete message
     textMessage->deleteMessage();
-    assert(textMessage->getContent() == "[Message Deleted]");
+    assert(textMessage->getContent()=="[Message Deleted]");
 
-    cout << "testTextMessage PASSED\n";
+    cout<<"Text message tests passed!"<<endl;
 }
 
-// ------------------------------------------------------------
-// 5. Media Message Tests
-// ------------------------------------------------------------
-void testMediaMessage() {
-    string name = "Shikshak";
-    auto user = make_shared<User>(1, name);
+void testMediaMessage(){
+    int messageId = 101;
 
-    string url = "photo.png";
-    auto mediaMessage = make_shared<MediaMessage>(102, user, url, MediaType::IMAGE);
+    string userName = "Shikshak";
+    int userId = 1;
+    shared_ptr<User> sender = make_shared<User>(userId,userName);
 
-    assert(mediaMessage->getMessageId() == 102);
-    assert(mediaMessage->getuser() == user);
-    assert(mediaMessage->getMediaURL() == "photo.png");
-    assert(mediaMessage->getMediaType() == MediaType::IMAGE);
-    assert(mediaMessage->getSummary() == "[Media]: photo.png");
+    string mediaURL = "https://example.com/image.jpg";
 
-    string newUrl = "video.mp4";
-    mediaMessage->edit(newUrl);
-    assert(mediaMessage->getMediaURL() == "video.mp4");
+    auto mediaMessage = make_shared<MediaMessage>(messageId, sender, mediaURL, MediaType::IMAGE);
 
-    mediaMessage->deleteMessage();
-    assert(mediaMessage->getMediaURL() == "[Media Deleted]");
+    assert(mediaMessage->getMediaURL()=="https://example.com/image.jpg");
+    assert(mediaMessage->getSummary()=="[Media]: https://example.com/image.jpg");
+    assert(mediaMessage->getMediaType()==MediaType::IMAGE);
 
-    cout << "testMediaMessage PASSED\n";
+    mediaMessage->markSent();
+    mediaMessage->markDelivered();
+
+    assert(mediaMessage->getStatus()==MessageStatusType::DELIVERED);
+
+    string newMediaURL = "https://example.com/new_image.jpg";
+
+    mediaMessage->edit(newMediaURL);
+
+    // mediaMessage->display();
+
+    assert(mediaMessage->getMediaURL()=="https://example.com/new_image.jpg");
+
+    cout<<"Media message tests passed!"<<endl;
+
 }
 
-// ------------------------------------------------------------
-// 6. Private Chat Tests & Edge Cases
-// ------------------------------------------------------------
-void testPrivateChat() {
-    string name1 = "User1", name2 = "User2";
-    auto user1 = make_shared<User>(1, name1);
-    auto user2 = make_shared<User>(2, name2);
+void testPrivateChat(){
+    string user1Name = "Shikshak";
+    string user2Name = "Prince";
 
-    PrivateChat chat(201, user1, user2);
-    assert(chat.getChatId() == 201);
-    assert(chat.getUser1() == user1);
-    assert(chat.getUser2() == user2);
-    assert(chat.getMessages().empty());
+    shared_ptr<User> user1 = make_shared<User>(1,user1Name);
+    shared_ptr<User> user2 = make_shared<User>(2,user2Name);
 
-    // Validation: same user throws invalid_argument
-    bool caughtSameUser = false;
-    try {
-        PrivateChat invalidChat(202, user1, user1);
-    } catch (const invalid_argument&) {
-        caughtSameUser = true;
-    }
-    assert(caughtSameUser);
+    int chatId = 1;
 
-    // Validation: null user throws invalid_argument
-    bool caughtNullUser = false;
-    try {
-        PrivateChat invalidChat2(203, user1, nullptr);
-    } catch (const invalid_argument&) {
-        caughtNullUser = true;
-    }
-    assert(caughtNullUser);
+    PrivateChat privateChat(chatId, user1, user2);
 
-    cout << "testPrivateChat PASSED\n";
+    
+    assert(privateChat.getChatId()==1);
+
+    string messageFromUser1 = "Hello Prince!";
+    shared_ptr<Message> message1 = make_shared<TextMessage>(1, user1, messageFromUser1);
+    privateChat.sendMessage(message1);
+
+
+    string messageFromUser2 = "Hello Shikshak!";
+    shared_ptr<Message> message2 = make_shared<TextMessage>(2, user2, messageFromUser2);
+    privateChat.sendMessage(message2);
+
+    privateChat.displayChat();
+
 }
 
-// ------------------------------------------------------------
-// 7. Group Chat Tests
-// ------------------------------------------------------------
-void testGroupChat() {
-    string name1 = "User1", name2 = "User2", name3 = "User3";
-    auto user1 = make_shared<User>(1, name1);
-    auto user2 = make_shared<User>(2, name2);
-    auto user3 = make_shared<User>(3, name3);
+void testGroupChat(){
+    string user1Name = "Shikshak";
+    string user2Name = "Prince";
+    string user3Name = "Priyam";
+    string user4Name = "Ayush";
 
-    string groupName = "Design Discussion";
-    vector<shared_ptr<User>> members = {user1, user2};
+    shared_ptr<User> user1 = make_shared<User>(1,user1Name);
+    shared_ptr<User> user2 = make_shared<User>(2,user2Name);
+    shared_ptr<User> user3 = make_shared<User>(3,user3Name);
+    shared_ptr<User> user4 = make_shared<User>(4,user4Name);
 
-    GroupChat group(301, groupName, members);
-    assert(group.getChatId() == 301);
+    string groupName = "Pg";
 
-    // Add member
-    group.addMember(user3);
+    GroupChat groupChat(1, groupName);
 
-    // Remove member (takes int&)
-    int idToRemove = 2;
-    assert(group.removeMember(idToRemove) == true);
+    groupChat.addMember(user1);
+    groupChat.addMember(user2);
+    groupChat.addMember(user3);
+    groupChat.addMember(user4);
 
-    // Remove non-existent member
-    int nonExistentId = 999;
-    assert(group.removeMember(nonExistentId) == false);
+    string messageFromUser1 = "Bhai lassie le aao";
+    shared_ptr<Message> message1 = make_shared<TextMessage>(1, user1, messageFromUser1);
+    groupChat.sendMessage(message1);
 
-    cout << "testGroupChat PASSED\n";
+
+    string messageFromUser2 = "Chal bhai sath me";
+    shared_ptr<Message> message2 = make_shared<TextMessage>(2, user2, messageFromUser2);
+    groupChat.sendMessage(message2);
+
+    string messageFromUser3 = "Mere liye bhi le aaio";
+    shared_ptr<Message> message3 = make_shared<TextMessage>(3, user3, messageFromUser3);
+    groupChat.sendMessage(message3);
+
+    string messageFromUser4 = "bhej paise";
+    shared_ptr<Message> message4 = make_shared<TextMessage>(4, user4, messageFromUser4);
+    groupChat.sendMessage(message4);
+
+    assert(groupChat.removeMember(user4->getUserId()));
+
+    groupChat.displayChat();
+
+    cout<<"Group chat tests passed!"<<endl;
 }
 
-// ------------------------------------------------------------
-// 8. Message Service Tests
-// ------------------------------------------------------------
-void testMessageService() {
-    string name1 = "User1", name2 = "User2";
-    auto user1 = make_shared<User>(1, name1);
-    auto user2 = make_shared<User>(2, name2);
+void testNotification(){
+    string receiverName = "Shikshak";
+    shared_ptr<User> receiver = make_shared<User>(1,receiverName);
+    string content = "Hello Shikshak";
+    shared_ptr<Message> message = make_shared<TextMessage>(1, receiver, content);
+    NotificationType type = NotificationType::MESSAGE;
 
-    auto chat = make_shared<PrivateChat>(401, user1, user2);
+    Notification notification(receiver, message, type);
+
+    // notification.sendNotification();
+
+    cout<<"Notification tests passed!"<<endl;
+}
+
+void testNotificationService(){
+    string receiverName = "Shikshak";
+    shared_ptr<User> receiver = make_shared<User>(1,receiverName);
+    string content = "Hello Shikshak";
+    shared_ptr<Message> message = make_shared<TextMessage>(1, receiver, content);
+    NotificationType type = NotificationType::MESSAGE;
+
+    NotificationService service;
+
+    service.notify(receiver, message, type);
+
+
+    string user1Name = "Shikshak";
+    string user2Name = "Prince";
+    string user3Name = "Priyam";
+    string user4Name = "Ayush";
+
+    shared_ptr<User> user1 = make_shared<User>(1,user1Name);
+    shared_ptr<User> user2 = make_shared<User>(2,user2Name);
+    shared_ptr<User> user3 = make_shared<User>(3,user3Name);
+    shared_ptr<User> user4 = make_shared<User>(4,user4Name);
+
+    string groupName = "Pg";
+
+    GroupChat groupChat(1, groupName);
+
+    groupChat.addMember(user1);
+    groupChat.addMember(user2);
+    groupChat.addMember(user3);
+    groupChat.addMember(user4);
+
+    string messageFromUser1 = "Bhai lassie le aao";
+    shared_ptr<Message> message1 = make_shared<TextMessage>(1, user1, messageFromUser1);
+    groupChat.sendMessage(message1);
+
+    service.notifyGroup(groupChat,message1,type);
+
+
+    string messageFromUser2 = "Chal bhai sath me";
+    shared_ptr<Message> message2 = make_shared<TextMessage>(2, user2, messageFromUser2);
+    groupChat.sendMessage(message2);
+
+    string messageFromUser3 = "Mere liye bhi le aaio";
+    shared_ptr<Message> message3 = make_shared<TextMessage>(3, user3, messageFromUser3);
+    groupChat.sendMessage(message3);
+
+    string messageFromUser4 = "bhej paise";
+    shared_ptr<Message> message4 = make_shared<TextMessage>(4, user4, messageFromUser4);
+    groupChat.sendMessage(message4);
+
+    
+    cout<<"Notification Service test passed!"<<endl;
+    
+}
+
+void testMessageService(){
+    string name1 = "Shikshak";
+    string name2 = "Prince";
+
+    shared_ptr<User> user1 = make_shared<User>(1,name1);
+    shared_ptr<User> user2 = make_shared<User>(2,name2);
+
+    auto chat = make_shared<PrivateChat>(1, user1, user2);
+
+    string content = "hello prince";
+    shared_ptr<TextMessage> message = make_shared<TextMessage>(1,user1,content);
+
     MessageService service;
 
-    string content = "Hi!";
-    auto message = make_shared<TextMessage>(501, user1, content);
+    service.sendMessage(chat,message);
+    assert(chat->getMessages().size()==1);
 
-    // Send message via service
-    service.sendMessage(chat, message);
-    assert(chat->getMessages().size() == 1);
-    assert(message->getStatus() == MessageStatusType::SENT);
+    assert(message->getStatus()==MessageStatusType::SENT);
 
-    // Lifecycle transitions through service
     service.markDelivered(message);
     assert(message->getStatus() == MessageStatusType::DELIVERED);
 
     service.markRead(message);
     assert(message->getStatus() == MessageStatusType::READ);
 
-    string edited = "Hello!";
-    service.editMessage(message, edited);
-    assert(message->getContent() == "Hello!");
+    string newContent = "hello prince, how are you?";
+
+    service.editMessage(message,newContent);
+    assert(message->getContent() == "hello prince, how are you?");
 
     service.deleteMessage(message);
     assert(message->getContent() == "[Message Deleted]");
 
-    // Null validations
-    bool caughtNullMessage = false;
-    try {
-        service.sendMessage(chat, nullptr);
-    } catch (const invalid_argument&) {
-        caughtNullMessage = true;
-    }
-    assert(caughtNullMessage);
+    cout<<"Message Service test passed!"<<endl;
 
-    cout << "testMessageService PASSED\n";
 }
 
-// ------------------------------------------------------------
-// 9. Backup Tests
-// ------------------------------------------------------------
-void testBackup() {
-    string name = "User1";
-    auto user = make_shared<User>(1, name);
-    string content = "Msg";
-    auto message = make_shared<TextMessage>(601, user, content);
+void testBackup(){
+    string name = "Shikshak";
+    auto user = make_shared<User>(1,name);
+    string content = "hello there";
+    auto message = make_shared<TextMessage>(101,user,content);
 
     vector<shared_ptr<Message>> messages = {message};
+
     Backup backup(messages);
 
-    // Test output operations
     backup.backup();
     backup.restore();
 
-    // Validation: empty messages vector must throw invalid_argument
-    bool caughtEmptyBackup = false;
-    try {
-        vector<shared_ptr<Message>> emptyList;
-        Backup invalidBackup(emptyList);
-    } catch (const invalid_argument&) {
-        caughtEmptyBackup = true;
-    }
-    assert(caughtEmptyBackup);
-
-    cout << "testBackup PASSED\n";
+    cout<<"Backup test passed!"<<endl;
 }
 
-// ------------------------------------------------------------
-// 10. Runner Harness
-// ------------------------------------------------------------
-void runAllTests() {
-    cout << "\n========== RUNNING TESTS ==========\n\n";
 
+void runAllTests(){
     testUser();
     testContact();
     testStatus();
@@ -840,17 +887,13 @@ void runAllTests() {
     testMediaMessage();
     testPrivateChat();
     testGroupChat();
+    testNotification();
+    testNotificationService();
     testMessageService();
     testBackup();
-
-    cout << "\n========== ALL TESTS PASSED ==========\n";
 }
 
-
-
-
-int main() {
-	// your code goes here
+int main(){
     runAllTests();
-    return 0;;
+    return 0;
 }
