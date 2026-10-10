@@ -322,13 +322,13 @@ class Chat{
 
 
 //      why needed explicit ? 
-//      Chat chat = 101;  // ❌
+//      Chat chat = 101;  
 
 //      C++ says:
 //      No, you cannot automatically convert 101 into a Chat
 
 //      But this is fine:
-//      Chat chat(101);   // ✅
+//      Chat chat(101);  
 
 //      Because you're explicitly saying:
 //      "I want to create a Chat with ID 101"
