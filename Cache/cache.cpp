@@ -112,6 +112,8 @@ class LRUPolicy : public EvictionPolicy{
         void onInsert(const string &key) override{
             order.push_front(key);
             position[key] = order.begin();
+
+            cout<<"\n[Policy]: Evicting on insert\n";
         }
         
         void onRemove(const string &key) override{
@@ -125,6 +127,8 @@ class LRUPolicy : public EvictionPolicy{
             order.erase(it->second);
             
             position.erase(it);
+
+            cout<<"\n[Policy]: Evicting on remove\n";
         }
         
         void onAcess(const string &key) override{
@@ -139,6 +143,8 @@ class LRUPolicy : public EvictionPolicy{
             order.push_front(key);
             
             position[key] = order.begin();
+
+            cout<<"\n[Policy]: Evicting on access\n";
         }
         
         string getVictim() override {
@@ -199,6 +205,9 @@ class CacheNode{
                 
                 return;
             }
+
+            cout<<"\n[Cache Node]: New data found.\n";
+            cout<<"Key: "<<key<<" Value: "<<value<<"\n";
             
             if((int)cache.size()>=capacity){
                 string victim = policy->getVictim(); // key
@@ -227,6 +236,22 @@ class CacheNode{
         
         string getNodeId() const {
             return nodeId;
+        }
+
+        void printKeys() {
+            lock_guard<mutex> lock(mtx);
+
+            cout << "  [" << nodeId << "] Cache: ";
+
+            if (cache.empty()) {
+                cout << "EMPTY";
+            } else {
+                for (auto &it : cache) {
+                    cout << it.first << " ";
+                }
+            }
+
+            cout << endl;
         }
 };
 
@@ -322,6 +347,16 @@ class DistributedCache{
             
             nodes[nodeId]->remove(key);
         }
+
+        void printNodeContents() {
+            cout << "\n========== CACHE STATE ==========\n";
+
+            for (auto &it : nodes) {
+                it.second->printKeys();
+            }
+
+            cout << "=================================\n";
+        }
 };
 
 void runDemo(){
@@ -336,7 +371,10 @@ void runDemo(){
     cache.addNode(node3);
     
     cache.put("user:1","Shikshak");
-    cache.put("user:2","Ashmita");
+    cache.put("user:2","Rahul");
+    cache.put("user:3","John Doe");
+
+    cache.printNodeContents();
     
     auto value = cache.get("user:1");
     
@@ -358,7 +396,55 @@ void runDemo(){
     if(!value.has_value()){
         cout<<"Cache miss after deleted\n";
     }
+
+    cout << "\n[TEST] TTL expiration\n";
+
+    cout << "Inserting session:1 with TTL = 1000 ms\n";
+
+    cache.put(
+        "session:1",
+        "ACTIVE",
+        1000
+    );
+
+    value = cache.get("session:1");
+
+    cache.printNodeContents();
+
+    if (value.has_value()) {
+        cout << "Immediately after PUT:\n";
+        cout << "GET session:1 -> "
+             << value.value()
+             << " [HIT]\n";
+    }
+    else {
+        cout << "session:1 -> MISS\n";
+    }
+
+    
+
+    cout << "Sleeping for 1200 ms...\n";
+
+    this_thread::sleep_for(
+        chrono::milliseconds(1200)
+    );
+
+    value = cache.get("session:1");
+
+    cache.printNodeContents();
+
+    if (value.has_value()) {
+        cout << "GET session:1 -> "
+             << value.value()
+             << " [STILL VALID]\n";
+    }
+    else {
+        cout << "GET session:1 -> CACHE MISS\n";
+        cout << "TTL expiration worked successfully.\n";
+    }
 }
+
+
 
 
 int main(){
