@@ -17,6 +17,7 @@
 #include <cassert>
 #define ll long long
 using namespace std;
+using namespace std::chrono_literals;
 
 /*
    NOTE - When to use std::move():
@@ -49,7 +50,7 @@ class CacheEntry{
         ll expiryTimeMs;
     public:
         CacheEntry(const string value="", const ll ttlMs=-1):
-        value(move(value)){
+        value(std::move(value)){
             if(ttlMs==-1){
                 expiryTimeMs = -1;
             }
@@ -166,8 +167,8 @@ class CacheNode{
     public:
     
         CacheNode(const string &nodeId, const int &capacity, unique_ptr<EvictionPolicy> policy):
-        nodeId(move(nodeId)),
-        policy(move(policy)),
+        nodeId(nodeId),
+        policy(std::move(policy)),
         capacity(capacity){};
         
         optional<string> get(const string &key){
@@ -425,9 +426,7 @@ void runDemo(){
 
     cout << "Sleeping for 1200 ms...\n";
 
-    this_thread::sleep_for(
-        chrono::milliseconds(1200)
-    );
+    this_thread::sleep_for(1200ms);
 
     value = cache.get("session:1");
 
