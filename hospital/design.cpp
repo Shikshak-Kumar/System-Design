@@ -422,22 +422,7 @@ public:
 //   - price : double
 // ============================================================
 
-class Medicine {
-private:
-    int id;
-    Date expiry;
-    string chemical;
-    double price;
 
-public:
-    Medicine(int id = 0, Date expiry = Date(), string chemical = "", double price = 0.0)
-        : id(id), expiry(expiry), chemical(chemical), price(price) {}
-
-    int getId() const { return id; }
-    Date getExpiry() const { return expiry; }
-    string getChemical() const { return chemical; }
-    double getPrice() const { return price; }
-};
 
 // ============================================================
 // Strategy Pattern: PaymentStrategy
