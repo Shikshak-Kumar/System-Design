@@ -240,8 +240,8 @@ class Appointment{
         }
     
         void printAppointment() const {
-            cout << "Appointment ID: " << id << endl;
-            cout << "Reason: " << reason << endl;
+            cout << "[Appointment] Appointment ID: " << id << endl;
+            cout << "[Appointment] Reason: " << reason << endl;
         }
         
 };
@@ -295,7 +295,7 @@ class Patient : public Person{
             cout<<"[Patient]: Claim added\n";
         }
         
-        vector<Claim> getClaims(){
+        vector<Claim>& getClaims(){
             return insurance;
         }
         
@@ -721,8 +721,24 @@ class Bill{
             return total;
         }
         
-        void pay(PaymentType paymentType){
+        void pay(shared_ptr<Patient> patient, PaymentType paymentType){
             double amount = getTotal();
+            
+            for(auto &claim : patient->getClaims()){
+                claim.submit();
+                if(claim.getAmount() >= amount){
+                    claim.approve();
+                    cout << "[Insurance] Claim #" << claim.getClaimId() << " (" << claim.getProvider()
+                         << ", Limit: ₹" << claim.getAmount() << ") \n Bill Total (₹" << amount
+                         << ") -> Claim APPROVED! Bill settled via Insurance.\n";
+                    return;
+                } else {
+                    claim.reject();
+                    cout << "[Insurance] Claim #" << claim.getClaimId() << " (" << claim.getProvider()
+                         << ", Limit: ₹" << claim.getAmount() << ") < Bill Total (₹" << amount
+                         << ") -> Claim REJECTED.\n";
+                }
+            }
             
             Payment payment(amount);
             
@@ -733,90 +749,133 @@ class Bill{
 
 
 
-
-
-
-
-int main(){
-    cout << "============================================================" << endl;
-    cout << "      HOSPITAL LOW-LEVEL DESIGN (LLD) DEMO TEST             " << endl;
-    cout << "============================================================\n" << endl;
-
+void runDemo(){
+    
     // 1. Contacts
-    ContactInfo contactP1("9876543210", "rahul@gmail.com", "Delhi");
-    ContactInfo contactP2("9876543211", "aman@gmail.com", "Noida");
-    ContactInfo contactDoc("9999999999", "sharma@hospital.com", "New Delhi");
-    ContactInfo contactNurse("8888888888", "neha@hospital.com", "New Delhi");
-
-    ContactInfo* cP1 = &contactP1;
-    ContactInfo* cP2 = &contactP2;
-    ContactInfo* cDoc = &contactDoc;
-    ContactInfo* cNurse = &contactNurse;
-
+    
+    ContactInfo* cP1 = new ContactInfo("9876543210", "rahul@gmail.com", "Delhi");
+    ContactInfo* cP2 = new ContactInfo("9876543211", "aman@gmail.com", "Noida");
+    ContactInfo* cDoc = new ContactInfo("9999999999", "sharma@hospital.com", "New Delhi");
+    ContactInfo* cNurse = new ContactInfo("8888888888", "neha@hospital.com", "New Delhi");
+    
     Gender male = Gender::MALE;
     Gender female = Gender::FEMALE;
-
+    
     // 2. Patients & Claims
+    
     auto p1 = make_shared<Patient>("Rahul", 30, male, cP1, BloodGroupType::O_POS);
     auto p2 = make_shared<Patient>("Aman", 25, male, cP2, BloodGroupType::A_POS);
-
+    
     Claim claim1(501, "Star Health", 4000.0, "Pending");
-    claim1.submit();
-    claim1.approve();
     p1->addClaim(claim1);
-
-    // 3. Staff: Doctor & Nurse
+    
+     // 3. Staff: Doctor & Nurse
     Date docDoj(1, 1, 2019);
     Date nurseDoj(1, 6, 2021);
-
+    
     Doctor doctor("Sharma", 45, male, cDoc, 180000.0, docDoj, "Cardiology", "DOC-CARD-441");
     Nurse nurse("Neha", 28, female, cNurse, 65000.0, nurseDoj, "Morning", "ICU-2");
-
+    
     nurse.assist(*p1);
-
+    
     // 4. Department & Rooms
     Department cardiology(10, "Cardiology");
     cardiology.addDoctor(&doctor);
-
+    
     Room r101(101);
     Room r102(102);
+    
     cardiology.addRoom(&r101);
     cardiology.addRoom(&r102);
-
+    
+    
+    
     // 5. Appointment
+    
+    // p1 is a shared_ptr.
+    // // It owns a Patient object.
+    // shared_ptr<Patient> p1 = make_shared<Patient>("Rahul");
+    
+    // // .get() gives us the raw pointer stored inside p1.
+    // // Type returned: Patient*
+    // Patient* p = p1.get();
+    
+    // // p1 still owns the Patient object.
+    // // .get() does NOT remove or transfer ownership.
+    
+    // cout << p->getName() << endl;
+    
+    
+    // For example, if your function is:
+    
+    // void assignPatient(Patient* patient);
+    
+    // you need:
+    // assignPatient(p1.get());   // ✅
+    
+    // Not:
+    // assignPatient(*p1);        // ❌ Patient& is not Patient*
+    
+    // But if the function is:
+    // void assignPatient(Patient& patient);
+    
+    // then:
+    // assignPatient(*p1);        // ✅
+    
+    
+    // shared_ptr<Patient> p1;
+
+    // p1          // shared_ptr
+    // *p1         // Patient object/reference
+    // p1.get()    // Patient* raw pointer
+    // p1->foo()   // call Patient's function
+
+
     auto app1 = make_unique<Appointment>(&doctor, p1.get(), "Cardiology Consultation");
     app1->printAppointment();
     p1->addAppointment(app1);
-
+    
     // 6. Room Acquisition & Treatment
+    
     Room* allocatedRoom = cardiology.acquireRoom(p1);
+    
     doctor.isTreating(*p1);
-
+    
+    
     // 7. Prescription & Medicines
+    
     Medicine med1(1, Date(31, 12, 2027), "Paracetamol 500mg", 80.0);
     Medicine med2(2, Date(31, 12, 2027), "Atorvastatin 10mg", 320.0);
-
+    
     Prescription rx(1001, &doctor, p1.get());
+    
     string code1 = "MED1";
     string code2 = "MED2";
+    
     rx.addMedicine(code1, med1);
     rx.addMedicine(code2, med2);
     rx.print();
-
+    
     // 8. Billing & Payment
     Bill bill;
     bill.addMedicine(med1);
     bill.addMedicine(med2);
     bill.returnMedicine(med1);
-    bill.getTotal();
-    bill.pay(PaymentType::UPI);
-
+    bill.pay(p1, PaymentType::UPI);
+    
     // 9. Release Room & Print Patient Info
     if (allocatedRoom) {
         cardiology.releaseRoom(allocatedRoom->getRoomNo(), p1);
     }
 
     p1->getInfo();
+    
+}
 
+
+int main(){
+    
+    runDemo();
+    
     return 0;
 }
